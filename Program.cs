@@ -4,6 +4,9 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+const double dMaxBrightness = 0.2;
+const int iFrameDelayMillis = 60;
+
 Main();
 
 
@@ -22,57 +25,107 @@ void Main() {
     {
         Console.WriteLine("Client disconnected!");
     };
-    
+
     client.Connect(10);
 
-    SocketRequest request = new();
-    request.unCommandID = WIFI_COMMAND.WIFI_COMMAND_PIXELDATA64;
-    request.unChannelID = 0;
-    request.ulSeconds = 0;
-    request.ulMicros = 0;
-    byte[] bPixelValues = new byte[0];
-    appendBytes(ref bPixelValues,setPixelValues(0xff, 0x55, 0x77));
-    appendBytes(ref bPixelValues,setPixelValues(0xff, 0xff, 0x00));
-    appendBytes(ref bPixelValues,setPixelValues(0xff, 0x00, 0x77));
-    appendBytes(ref bPixelValues,setPixelValues(0x00, 0xff, 0x00));
-    appendBytes(ref bPixelValues,setPixelValues(0xff, 0x00, 0x00));
-    for (int i = 0; i < 139; i++)
+    for (int j = 0; j < 900; j++)
     {
-        if (i % 5 == 0 || i % 11 == 0)
+        int iFrameDelay = iFrameDelayMillis + 300;
+        byte[] bPixelValues = new byte[0];
+        SocketRequest request = new();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"Generating Pixel Data for Frame: {j}");
+        Console.ForegroundColor = ConsoleColor.White;
+        request = new();
+        request.unCommandID = WIFI_COMMAND.WIFI_COMMAND_PIXELDATA64;
+        request.unChannelID = 0;
+        request.ulSeconds = 0;
+        request.ulMicros = 0;
+        for (int i = 1; i < 60; i++)
         {
-            appendBytes(ref bPixelValues, setPixelValuesByColor(Color.DeepPink, 50));
+            // PixelData pixel = GenerateSinRainbow(1, 3.2898681, (i+j) / 30 + 1 / 30);
+            // PixelData pixel = GenerateRandomColors();
+            PixelData pixel = GenerateRandomChristmasColors();
+            appendBytes(ref bPixelValues, setPixelValues(pixel.R, pixel.G, pixel.B));
         }
-        else if (i % 3 == 0)
+        request.uLength = (uint)bPixelValues.Length / 3 * 5;
+        byte[] requestBytes = getRequestPacketBytes(request);
+        for (int i = 0; i < 5; i++)
         {
-            appendBytes(ref bPixelValues, setPixelValuesByColor(Color.White, 30));
+            appendBytes(ref requestBytes, bPixelValues);
         }
-        else
-        {
-            appendBytes(ref bPixelValues, setPixelValuesByColor(Color.Navy, 20));
-        }
-    }
-    request.uLength = (uint)bPixelValues.Length/3*2;
-    byte[] requestBytes = getRequestPacketBytes(request);
-    appendBytes(ref requestBytes, bPixelValues);
-    appendBytes(ref requestBytes, bPixelValues);
 
-    for (int i = 0; i < 100; i++)
-    {
         client.Send(requestBytes);
-        Thread.Sleep(30);
+        Thread.Sleep(10);
+        ReadResult rr = null;
+        try
+        {
+            rr = client.Read(64);
+            SocketResponse response = getResponseFromBytes(rr.Data);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Wi-Fi Signal Strength: {response.dWifiSignal} dBm // Frame Rate: {response.uFpsDrawing} fps // Watts: {response.uWatts}W");
+            Console.ForegroundColor = ConsoleColor.White;
+        }
+        catch
+        {
+            if (rr.Data is null)
+            {
+                Console.Error.WriteLine("ERROR: No data received from NightDriver. Check the IP address and try again.");
+            };
+            //Do nothing
+        }
+        Thread.Sleep(iFrameDelay);
+
     }
-    ReadResult rr = null;
-    try
-    {
-        rr = client.Read(64);
-        SocketResponse response = getResponseFromBytes(rr.Data);
-        Console.WriteLine($"Wi-Fi Signal Strength: {response.dWifiSignal}");
-    }
-    finally
-    {
-        client.Disconnect();
-        Console.WriteLine("Press any key to exit. . .");
-    }
+
+    //SocketRequest request = new();
+    //request.unCommandID = WIFI_COMMAND.WIFI_COMMAND_PIXELDATA64;
+    //request.unChannelID = 0;
+    //request.ulSeconds = 0;
+    //request.ulMicros = 0;
+    //byte[] bPixelValues = new byte[0];
+    //appendBytes(ref bPixelValues,setPixelValues(0xff, 0x55, 0x77));
+    //appendBytes(ref bPixelValues,setPixelValues(0xff, 0xff, 0x00));
+    //appendBytes(ref bPixelValues,setPixelValues(0xff, 0x00, 0x77));
+    //appendBytes(ref bPixelValues,setPixelValues(0x00, 0xff, 0x00));
+    //appendBytes(ref bPixelValues,setPixelValues(0xff, 0x00, 0x00));
+    //for (int i = 0; i < 139; i++)
+    //{
+    //    if (i % 5 == 0 || i % 11 == 0)
+    //    {
+    //        appendBytes(ref bPixelValues, setPixelValuesByColor(Color.DeepPink, 50));
+    //    }
+    //    else if (i % 3 == 0)
+    //    {
+    //        appendBytes(ref bPixelValues, setPixelValuesByColor(Color.White, 30));
+    //    }
+    //    else
+    //    {
+    //        appendBytes(ref bPixelValues, setPixelValuesByColor(Color.Navy, 20));
+    //    }
+    //}
+    //request.uLength = (uint)bPixelValues.Length/3*2;
+    //byte[] requestBytes = getRequestPacketBytes(request);
+    //appendBytes(ref requestBytes, bPixelValues);
+    //appendBytes(ref requestBytes, bPixelValues);
+
+    //for (int i = 0; i < 100; i++)
+    //{
+    //    client.Send(requestBytes);
+    //    Thread.Sleep(30);
+    //}
+    //ReadResult rr = null;
+    //try
+    //{
+    //    rr = client.Read(64);
+    //    SocketResponse response = getResponseFromBytes(rr.Data);
+    //    Console.WriteLine($"Wi-Fi Signal Strength: {response.dWifiSignal}");
+    //}
+    //finally
+    //{
+    client.Disconnect();
+    Console.WriteLine("Press any key to exit. . .");
+    //}
 
     ConsoleKeyInfo key = Console.ReadKey(false);
     if (key.KeyChar == 'r' || key.KeyChar == 'R')
@@ -85,9 +138,9 @@ void Main() {
 byte[] setPixelValues(byte red, byte green, byte blue)
 {
     byte[] bPixelValues = new byte[3];
-    bPixelValues[0] = red;
-    bPixelValues[1] = green;
-    bPixelValues[2] = blue;
+    bPixelValues[0] = (byte)Math.Truncate(red * dMaxBrightness);
+    bPixelValues[1] = (byte)Math.Truncate(green * dMaxBrightness);
+    bPixelValues[2] = (byte)Math.Truncate(blue * dMaxBrightness);
 
     return bPixelValues;
 }
@@ -227,6 +280,88 @@ Color ColorFromAhsb(int alpha, float hue, float saturation, float brightness)
 }
 
 
+PixelData GenerateSinRainbow(double amplitude, double circularFrequency, double timeInterval)
+{
+    PixelData pixel = new();
+    int iPhaseAngleR = 0;
+    int iPhaseAngleG = 120;
+    int iPhaseAngleB = 240;
+    pixel.R = (byte)Math.Round(amplitude * Math.Sin(circularFrequency * timeInterval + iPhaseAngleR) * 128 + 128,0);
+    pixel.G = (byte)Math.Round(amplitude * Math.Sin(circularFrequency * timeInterval + iPhaseAngleG) * 128 + 128,0);
+    pixel.B = (byte)Math.Round(amplitude * Math.Sin(circularFrequency * timeInterval + iPhaseAngleB) * 128 + 128,0);
+    return pixel;
+}
+
+PixelData GenerateRandomColors()
+{
+    Random rnd = new();
+    PixelData pixel = new();
+    pixel.R = (byte)rnd.Next(192);
+    pixel.G = (byte)rnd.Next(192);
+    pixel.B = (byte)rnd.Next(192);
+    return pixel;
+}
+
+PixelData GenerateRandomChristmasColors()
+{
+    byte bRGThreshold = 75;
+    Random rnd = new();
+    PixelData pixel = new();
+    pixel.R = (byte)rnd.Next(255);
+    pixel.G = (byte)rnd.Next(255);
+    pixel.B = (byte)rnd.Next(255);
+
+    if (pixel.R >= 128)
+    {
+        pixel = getPixelFromBytes(setPixelValuesByColor(Color.DarkRed, 100));
+    }
+    else
+    {
+        pixel.R = 0;
+        if (pixel.R == 0 && pixel.G >= bRGThreshold)
+        {
+            pixel = getPixelFromBytes(setPixelValuesByColor(Color.DarkGreen, 100));
+        }
+        else
+        {
+            pixel.G = 0;
+            if (pixel.B >= Math.Max(bRGThreshold * 2, 240))
+            {
+                pixel.R = 255;
+                pixel.G = 255;
+                pixel.B = 255;
+            }
+            else if (pixel.B == 69)
+            {
+                pixel = getPixelFromBytes(setPixelValuesByColor(Color.DeepPink, 100));
+            }
+            else if (pixel.B == 83 || pixel.B == 13 || pixel.B == 11)
+            {
+                pixel = getPixelFromBytes(setPixelValuesByColor(Color.Goldenrod, 100));
+            }
+            else
+            {
+                pixel.B = 0;
+            }
+        }
+    }
+    
+    
+    if (pixel.R == 0 && pixel.G == 0 & pixel.B == 0)
+    {
+        switch (DateTime.Now.Millisecond % 5)
+        {
+            case 0: { pixel = getPixelFromBytes(setPixelValuesByColor(Color.DarkOliveGreen, 100)); break; }
+            case 1: { pixel = getPixelFromBytes(setPixelValuesByColor(Color.Goldenrod, 100)); break; }
+            case 2: { pixel = getPixelFromBytes(setPixelValuesByColor(Color.Crimson, 100)); break; }
+            case 3: { pixel = getPixelFromBytes(setPixelValuesByColor(Color.Teal, 100)); break; }
+            case 4: { pixel = getPixelFromBytes(setPixelValuesByColor(Color.Orange, 100)); break; }
+            default:{ break;  }
+        }
+    }
+    return pixel;
+}
+
 void Events_Disconnected(object? sender, ClientDisconnectedEventArgs e)
 {
     Console.WriteLine($"Disconnected from NightDriver strip server: {e.Reason}");
@@ -279,6 +414,24 @@ SocketResponse getResponseFromBytes(byte[] bDataBytes)
     return response;
 }
 
+PixelData getPixelFromBytes(byte[] bDataBytes)
+{
+    PixelData response = new PixelData();
+    int size = Marshal.SizeOf(response);
+    IntPtr ptr = IntPtr.Zero;
+    try
+    {
+        ptr = Marshal.AllocHGlobal(size);
+        Marshal.Copy(bDataBytes, 0, ptr, size);
+        response = (PixelData)Marshal.PtrToStructure(ptr, typeof(PixelData));
+    }
+    finally
+    {
+        Marshal.FreeHGlobal(ptr);
+    }
+    return response;
+}
+
 
 void appendBytes(ref byte[] source, byte[] bytes)
 {
@@ -324,4 +477,12 @@ public struct SocketResponse
     public uint uBufferPos;         // 4
     public uint uFpsDrawing;        // 4    
     public uint uWatts;             // 4
+};
+
+
+public struct PixelData
+{
+    public byte R;
+    public byte G;
+    public byte B;
 };
